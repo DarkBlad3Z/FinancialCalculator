@@ -388,7 +388,7 @@ function defaultInputs() {
     customStateRate: 0,
 
     /* --- Income (section 5) --- */
-    salary: 5_000_000,              // $150,000
+    salary: 15_000_000,              // $150,000
     salaryGrowth: 0.03,
     bonus: 0,
     otherIncome: 0,

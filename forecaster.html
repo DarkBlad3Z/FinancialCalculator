@@ -889,9 +889,25 @@ const AUTH_CONFIG = {
 
   /* --- 'dial' mode ---------------------------------------------- */
   dial: {
-    rings: 5,          // how many rings must be set. 2–8.
+    rings: 6,          // how many rings must be set. 2–8.
     arrows: 12,        // numbered markers on the bezel. 2–24.
     positions: 24,     // snap stops per ring. Must be >= arrows.
+
+    /* DAY RING. When true, the OUTERMOST ring is not part of the fixed
+     * combination: its target is the day of the week, Sunday = marker 1
+     * through Saturday = marker 7, in the VISITOR'S LOCAL timezone.
+     *
+     * What this buys, honestly: nothing against someone reading this
+     * file, because the rule is right here in the source and the day is
+     * public. What it does buy is protection against human leakage — a
+     * combination written on a sticky note, screenshotted, or passed on
+     * verbally is wrong six days out of seven unless the rule travels
+     * with it. For a tool shared with a handful of people that is the
+     * realistic threat, so it is a real gain.
+     *
+     * Note: the day is read fresh on every check, so a session spanning
+     * midnight will want the outer ring moved on. */
+    dayRing: true,
 
     /* THE COMBINATION IS NOT IN THIS FILE.
      * Stored instead is a PBKDF2-SHA256 verifier over it, so reading
@@ -908,9 +924,23 @@ const AUTH_CONFIG = {
      *
      * Generate a fresh combination with:  node set-combo.js
      * It prints the combo once, to your terminal, and writes only the
-     * hash here. */
-    comboSalt: 'qd7LfNlnpbN4heHxMKyPSA==',
-    comboHash: '+fWljyditbika/cFTsaFsBgBfmZB0+NNEPTtXLRFa1M=',
+     * hashes here.
+     *
+     * With dayRing on there are SEVEN verifiers, indexed by
+     * Date#getDay() (0 = Sunday). Each covers the whole arrangement
+     * including the day ring, so no ring is ever compared in plaintext.
+     * `comboHash` (singular) is the fallback when dayRing is off. */
+    comboSalt: 'SZYsefVayVIYAaL5sijX7A==',
+    comboHash: null,
+    comboHashes: [
+      'grh7W86n5N2dJiJiAuahsWhkt3bYKR6flwZJ7kz5F+I=',
+      'X+Ve4ibzFkj9QghGWWuyCNsTcxCqGnch7tEV1whAArs=',
+      'G0bgtzvsjSpJNUipvZ/d3TVInw0dWA+j9wtpYzq9wls=',
+      '4J3Vvh0fEUu+BiMmDi7UNsEOjfVaDdpWLYzNkK/zXf0=',
+      'Ixef6dsrEb2teEoQZV4I03A/X5KKqyvEGDvS5iHtoQs=',
+      'jNfr3sEBex2j9VsZq96KqL1zP49GyVVvfS1qeLVZC7w=',
+      'GtNDXBt5ClzAcPjyWQGwKG+l3hSSkMOXf2ji+dsZgU4=',
+    ],
     comboIterations: 250000,
   },
 
@@ -1099,6 +1129,7 @@ const AUTH_CONFIG = {
     const BEZEL_IN = ringOuter(RINGS - 1) + 4;
     const BEZEL_OUT = BEZEL_IN + BEZEL_W;
     const SLOT_HALF = STEP * 0.55;
+    const DAY_RING = !!AUTH_CONFIG.dial?.dayRing;
     const toAngle = (idx) => idx * STEP - Math.PI / 2;   // 0 = straight up
 
     let selected = 0;
@@ -1119,12 +1150,25 @@ const AUTH_CONFIG = {
      * verifier over it, so reading the source does not hand it over —
      * extracting it means writing a brute-forcer and paying 250,000
      * iterations per guess. See the header for the honest keyspace. */
+    /** The day ring's target marker index: Sunday 0 ... Saturday 6. */
+    const dayTargetIndex = () => new Date().getDay();
+
     async function comboMatches() {
       const cfg = AUTH_CONFIG.dial ?? {};
-      if (!cfg.comboHash || !cfg.comboSalt) {
-        // No combo configured: fall back to "every slot on arrow 0".
+
+      /* Pick the verifier for today. With a day ring there are seven,
+       * indexed by getDay(); the day is read at check time, not at load,
+       * so a page left open across midnight behaves correctly. */
+      const expected = (DAY_RING && Array.isArray(cfg.comboHashes))
+        ? cfg.comboHashes[dayTargetIndex()]
+        : cfg.comboHash;
+
+      if (!expected || !cfg.comboSalt) {
+        // Nothing configured: fall back to "every slot on marker 1", so
+        // a fresh clone is usable before set-combo.js has been run.
         return currentCombo().every((k) => k === 0);
       }
+
       const probe = currentCombo().join('-');
       const key = await crypto.subtle.importKey(
         'raw', new TextEncoder().encode(probe), { name: 'PBKDF2' }, false, ['deriveBits']
@@ -1133,7 +1177,7 @@ const AUTH_CONFIG = {
         { name: 'PBKDF2', salt: b64ToBytes(cfg.comboSalt),
           iterations: cfg.comboIterations ?? 250000, hash: 'SHA-256' }, key, 256
       );
-      return constantTimeEqual(bytesToB64(bits), cfg.comboHash);
+      return constantTimeEqual(bytesToB64(bits), expected);
     }
 
     function draw() {
@@ -1160,10 +1204,15 @@ const AUTH_CONFIG = {
         ctx.closePath();
         // Seated on SOME arrow is shown; whether it is the RIGHT arrow
         // is deliberately not, or the lock would leak its own answer.
-        ctx.fillStyle = solved ? '#bbf7d0' : seated ? '#d6e4fb' : '#dfe4ea';
+        const isDayRing = DAY_RING && i === RINGS - 1;
+        ctx.fillStyle = solved ? '#bbf7d0'
+          : seated ? (isDayRing ? '#e6dcfb' : '#d6e4fb')
+          : (isDayRing ? '#e7e3f0' : '#dfe4ea');
         ctx.fill();
         ctx.lineWidth = i === selected ? 2 : 1;
-        ctx.strokeStyle = i === selected ? '#2563eb' : seated ? '#9ec0f0' : '#c2c9d2';
+        ctx.strokeStyle = i === selected ? '#2563eb'
+          : seated ? (isDayRing ? '#b49ae8' : '#9ec0f0')
+          : (isDayRing ? '#cbc2de' : '#c2c9d2');
         ctx.stroke();
 
         // A short spoke in the slot, so each ring's aim is unambiguous.
@@ -1357,6 +1406,7 @@ const AUTH_CONFIG = {
         currentCombo, allOnArrows, comboMatches, nudge, draw,
         geom: { SIZE, C, ringInner, ringOuter, BEZEL_IN, BEZEL_OUT, HUB, toAngle, STEP },
         isSolved: () => !!solvedAt,
+        DAY_RING, dayTargetIndex,
         setCombo: (arrowIdx) => {
           for (let i = 0; i < RINGS; i++) angles[i] = arrowStop(arrowIdx[i]);
           return afterMove();
@@ -1366,8 +1416,12 @@ const AUTH_CONFIG = {
 
     return {
       interactive: true,
-      question: `Each of the ${RINGS} rings has to point at one specific numbered marker. `
-        + `There are ${ARROWS} markers and the pairing is not shown — you need the combination.`,
+      question: DAY_RING
+        ? `Each of the ${RINGS} rings has to point at one specific numbered marker, out of ${ARROWS}. `
+          + `The inner ${RINGS - 1} are a fixed combination. The outermost ring (the pale violet one) `
+          + `changes every day.`
+        : `Each of the ${RINGS} rings has to point at one specific numbered marker. `
+          + `There are ${ARROWS} markers and the pairing is not shown — you need the combination.`,
       hint: `Click straight onto a ring at the marker you want; it snaps there. `
         + `Ring numbers ride in each slot, marker numbers sit on the outer bezel. `
         + `Arrow keys work too: up and down pick a ring, left and right turn it.`,

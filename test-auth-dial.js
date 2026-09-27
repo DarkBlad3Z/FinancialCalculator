@@ -74,7 +74,17 @@ function mountFresh(){
   console.log();
   console.log('=== THE COMBO IS NOT IN THE SOURCE ===');
   const src=require('fs').readFileSync(__dirname+'/auth.js','utf8');
-  ok('a hash is stored', /comboHash:\s*'[A-Za-z0-9+/=]{20,}'/.test(src));
+  // Either form counts: a single verifier, or seven (one per weekday
+  // when the day ring is on).
+  const singleHash = /comboHash:\s*'[A-Za-z0-9+/=]{20,}'/.test(src);
+  const dayHashes = (src.match(/comboHashes:\s*\[([\s\S]*?)\]/) || [,''])[1]
+    .match(/'[A-Za-z0-9+/=]{20,}'/g) || [];
+  ok('a verifier is stored', singleHash || dayHashes.length > 0,
+     'single='+singleHash+' day='+dayHashes.length);
+  if (/dayRing:\s*true/.test(src)) {
+    ok('seven verifiers, one per weekday', dayHashes.length === 7, dayHashes.length+' found');
+    ok('they are all different', new Set(dayHashes).size === dayHashes.length);
+  }
   ok('no plaintext combo array', !/combo:\s*\[/.test(src));
   const bundle=require('fs').existsSync(__dirname+'/forecaster.html')
     ? require('fs').readFileSync(__dirname+'/forecaster.html','utf8') : '';
@@ -149,8 +159,10 @@ function mountFresh(){
   const testCombo=[2,3];
   const tSalt=crypto.randomBytes(16);
   const tHash=crypto.pbkdf2Sync(testCombo.join('-'),tSalt,1000,32,'sha256').toString('base64');
-  Object.assign(cfg,{rings:2,arrows:4,positions:8,comboSalt:tSalt.toString('base64'),
-    comboHash:tHash,comboIterations:1000});
+  // dayRing off here: this section is about the fixed keyspace.
+  Object.assign(cfg,{rings:2,arrows:4,positions:8,dayRing:false,
+    comboSalt:tSalt.toString('base64'),comboHash:tHash,comboHashes:null,
+    comboIterations:1000});
 
   let hits=[], tried=0;
   for(let a=0;a<4;a++) for(let b=0;b<4;b++){
@@ -204,6 +216,69 @@ function mountFresh(){
     await sleep(1200);
     ok('the correcting move still opens the lock', m.st.isSolved(),
        'combo now '+JSON.stringify(m.st.currentCombo()));
+  }
+
+  console.log();
+  console.log('=== DAY RING: correct on all seven days, wrong on the others ===');
+  // Freeze the clock to each weekday in turn and check the lock only
+  // opens for that day's arrangement. This is the whole point of the
+  // layer, so it is worth testing every day rather than just today.
+  {
+    const RealDate = Date;
+    const fakeDay = (d) => {
+      // A known Sunday, plus d days.
+      const base = RealDate.UTC(2026, 8, 27, 12, 0, 0);
+      const when = base + d * 86400000;
+      global.Date = class extends RealDate {
+        constructor(...a){ return a.length ? new RealDate(...a) : new RealDate(when); }
+        static now(){ return when; }
+        static UTC(...a){ return RealDate.UTC(...a); }
+      };
+    };
+
+    const cfg2 = AUTH_CONFIG.dial;
+    const prev = { rings: cfg2.rings, arrows: cfg2.arrows, positions: cfg2.positions,
+      salt: cfg2.comboSalt, hashes: cfg2.comboHashes, hash: cfg2.comboHash,
+      iter: cfg2.comboIterations, dayRing: cfg2.dayRing };
+
+    // Small, fast settings: 2 fixed rings + 1 day ring, 7 markers.
+    const FIXED=[1,3];
+    const tSalt=crypto.randomBytes(16);
+    const mk=(arr)=>crypto.pbkdf2Sync(arr.join('-'),tSalt,1000,32,'sha256').toString('base64');
+    Object.assign(cfg2, { rings:3, arrows:7, positions:7, dayRing:true,
+      comboSalt:tSalt.toString('base64'), comboHash:null, comboIterations:1000,
+      comboHashes: [0,1,2,3,4,5,6].map((d)=>mk([...FIXED,d])) });
+
+    let rightOpens=0, wrongOpens=0;
+    for (let d=0; d<7; d++) {
+      fakeDay(d);
+      // The day ring set to today: must open.
+      const a=mountFresh();
+      ok('day '+d+': dial reports the expected day index', a.st.dayTargetIndex()===d,
+         'got '+a.st.dayTargetIndex());
+      await a.st.setCombo([...FIXED, d]);
+      await sleep(60);
+      if (a.st.isSolved()) rightOpens++;
+      // The day ring set to a DIFFERENT day: must not open.
+      const b=mountFresh();
+      await b.st.setCombo([...FIXED, (d+3)%7]);
+      await sleep(60);
+      if (b.st.isSolved()) wrongOpens++;
+    }
+    ok('opens on all 7 days with that day set', rightOpens===7, rightOpens+'/7');
+    ok('never opens with the wrong day set', wrongOpens===0, wrongOpens+' opened');
+
+    // A correct day but wrong fixed rings must still fail.
+    fakeDay(2);
+    const c=mountFresh();
+    await c.st.setCombo([(FIXED[0]+1)%7, FIXED[1], 2]);
+    await sleep(60);
+    ok('right day, wrong fixed combo stays shut', !c.st.isSolved());
+
+    global.Date = RealDate;
+    Object.assign(cfg2, { rings:prev.rings, arrows:prev.arrows, positions:prev.positions,
+      comboSalt:prev.salt, comboHashes:prev.hashes, comboHash:prev.hash,
+      comboIterations:prev.iter, dayRing:prev.dayRing });
   }
 
   console.log();

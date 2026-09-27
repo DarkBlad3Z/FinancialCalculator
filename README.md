@@ -202,28 +202,65 @@ or `password` instead.
 
 ### The combination lock, and how to solve it
 
-Five concentric rings, each cut with one slot. Twelve numbered red markers on
+Six concentric rings, each cut with one slot. Twelve numbered red markers on
 the outer bezel. **Every ring has to point at one specific marker, and the
-pairing is not shown** — you need the combination.
+pairing is not shown** — you need the combination. The inner five are fixed;
+the outermost changes daily (see below).
 
 Ring numbers ride inside each slot; marker numbers sit on the bezel. A ring
 turns blue once it is seated on *any* marker, and the hub counts how many are
 seated. It deliberately does **not** tell you whether a ring is on the *right*
-marker — that would leak the answer one ring at a time. Seat all five and it
+marker — that would leak the answer one ring at a time. Seat them all and it
 either opens or says "that is not the combination."
 
-**Click straight onto a ring, at the marker you want.** It snaps there. Five
+**Click straight onto a ring, at the marker you want.** It snaps there. Six
 clicks and you are in. Dragging fine-tunes; arrow keys work too (up/down picks
 a ring, left/right turns it).
+
+### The day ring
+
+The **outermost** ring (tinted pale violet) is not part of the fixed
+combination. Its target is the day of the week, in the visitor's own timezone:
+
+| Day | Marker |
+|---|---|
+| Sunday | 1 |
+| Monday | 2 |
+| Tuesday | 3 |
+| Wednesday | 4 |
+| Thursday | 5 |
+| Friday | 6 |
+| Saturday | 7 |
+
+So if your fixed rings were `4-1-7-10-2`, you would enter `4-1-7-10-2-1` on a
+Sunday and `4-1-7-10-2-6` on a Friday. (An illustration — not a live
+combination.)
+
+`set-combo.js` stores **seven** PBKDF2 verifiers, one per weekday, each covering
+the whole six-ring arrangement. No ring is ever compared in plaintext, and the
+day is read at check time rather than page load, so a tab left open across
+midnight simply wants the outer ring moved on.
+
+**What this buys, honestly:** nothing against someone reading `auth.js` — the
+rule is in the source and the date is public, so the keyspace stays at
+`arrows ^ fixed rings`. What it does buy is protection against the *likely*
+leak: a combination on a sticky note, in a screenshot, or passed on verbally is
+wrong six days out of seven unless the rule travels with it. For a tool shared
+with a few people, that is the realistic threat.
+
+Turn it off with `dayRing: false` and re-run `set-combo.js`.
 
 ### Setting the combination
 
 ```
 node set-combo.js              # random, prints it once
-node set-combo.js 3 2 9 12 12  # one you choose
+node set-combo.js 4 1 7 10 2   # one you choose (fixed rings only)
 node set-combo.js --print      # show without writing
 node build.js                  # refresh forecaster.html
 ```
+
+With `dayRing` on you supply one number fewer than `rings` — the day ring is
+derived, not chosen.
 
 The combination is **never written to disk.** `set-combo.js` prints it to your
 terminal and writes only a PBKDF2-SHA256 verifier into `auth.js`. Generating it
@@ -240,7 +277,7 @@ angle. The only secret is which ring pairs with which marker, giving
 |---|---|---|---|
 | 8 | 4 | 4,096 | ~2 min |
 | 8 | 5 | 32,768 | ~14 min |
-| **12** | **5** | **248,832** | **~1.7 hours** |
+| **12** | **5 fixed + day** | **248,832** | **~1.7 hours** |
 | 12 | 6 | 2,985,984 | ~21 hours |
 | 16 | 6 | 16,777,216 | ~5 days |
 
