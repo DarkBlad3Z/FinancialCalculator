@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal Finance &amp; Retirement Forecasting Tool</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1 class="app-title">Personal Finance &amp; Retirement Forecasting Tool</h1>
+    <p class="app-sub">Year-by-year simulation &middot; <span id="cfgYear">2026</span> tax tables &middot; all figures nominal unless noted</p>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-label">Net worth at horizon</div><div class="hstat-value" id="hsNetWorth">—</div></div>
+    <div class="hstat"><div class="hstat-label">Lifetime tax</div><div class="hstat-value" id="hsTax">—</div></div>
+    <div class="hstat"><div class="hstat-label">Outcome</div><div class="hstat-value" id="hsStatus">—</div></div>
+  </div>
+</header>
+
+<div class="disclaimer">
+  <strong>Planning estimate only — not tax or investment advice.</strong>
+  Tax figures are simplified approximations based on published 2026 brackets and limits;
+  they ignore AMT, itemised deductions, credits, QBI, local income tax and state bracket detail.
+  Verify anything you intend to act on with a qualified tax or financial professional.
+</div>
+
+<div class="app-body">
+
+<!-- ============================ SIDEBAR ============================ -->
+<aside class="sidebar" id="sidebar">
+
+  <details class="group" open>
+    <summary>Scenario</summary>
+    <div class="group-body">
+      <div id="scenarioChips"></div>
+      <div class="toolbar" style="margin-top:8px">
+        <button class="sm" id="btnAddScenario">+ Add</button>
+        <button class="sm" id="btnDupScenario">Duplicate</button>
+        <button class="sm danger" id="btnDelScenario">Delete</button>
+      </div>
+      <div class="field">
+        <div class="field-head"><label for="scenName">Name</label></div>
+        <input type="text" id="scenName">
+      </div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>Profile &amp; horizon</summary>
+    <div class="group-body">
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Current age</label></div>
+          <input type="number" data-bind="currentAge" min="18" max="90"></div>
+        <div class="field"><div class="field-head"><label>Horizon (yrs)</label></div>
+          <input type="number" data-bind="horizonYears" min="1" max="70"></div>
+      </div>
+      <div class="field"><div class="field-head"><label>Filing status</label></div>
+        <select data-bind="filingStatus">
+          <option value="single">Single</option>
+          <option value="mfj">Married filing jointly</option>
+          <option value="hoh">Head of household</option>
+        </select></div>
+      <div class="field" id="spouseAgeField" style="display:none">
+        <div class="field-head"><label>Spouse age</label></div>
+        <input type="number" data-bind="spouseAge" min="18" max="90"></div>
+      <div class="field"><div class="field-head"><label>State of residence</label></div>
+        <select data-bind="stateCode" id="stateSelect"></select>
+        <div class="field-hint" id="stateNote"></div></div>
+      <div class="field" id="customStateField" style="display:none">
+        <div class="field-head"><label>Custom state rate</label>
+          <span class="field-value" data-out="customStateRate"></span></div>
+        <input type="range" data-bind="customStateRate" data-kind="rate" min="0" max="0.15" step="0.0025"></div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>Income</summary>
+    <div class="group-body">
+      <div class="field">
+        <div class="field-head"><label>Gross salary</label><span class="field-value" data-out="salary"></span></div>
+        <input type="range" data-bind="salary" data-kind="money" min="0" max="75000000" step="250000">
+        <input type="number" data-bind="salary" data-kind="money-num" style="margin-top:5px">
+      </div>
+      <div class="field">
+        <div class="field-head"><label>Annual raise</label><span class="field-value" data-out="salaryGrowth"></span></div>
+        <input type="range" data-bind="salaryGrowth" data-kind="rate" min="0" max="0.12" step="0.0025">
+      </div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Bonus</label></div>
+          <input type="number" data-bind="bonus" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>Other income</label></div>
+          <input type="number" data-bind="otherIncome" data-kind="money-num"></div>
+      </div>
+      <div class="field">
+        <div class="field-head"><label>Annual spending, after tax</label><span class="field-value" data-out="annualExpenses"></span></div>
+        <input type="range" data-bind="annualExpenses" data-kind="money" min="0" max="40000000" step="100000">
+        <div class="field-hint">What you actually consume while working. Do <strong>not</strong> include income tax — that is calculated separately. If you add a property below, leave its mortgage, tax, insurance and upkeep out of this figure too.</div>
+      </div>
+      <div class="field">
+        <div class="field-head"><label>Inflation</label><span class="field-value" data-out="inflation"></span></div>
+        <input type="range" data-bind="inflation" data-kind="rate" min="0" max="0.08" step="0.0025">
+      </div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>Contributions</summary>
+    <div class="group-body">
+      <div class="field"><div class="field-head"><label>401(k) input mode</label></div>
+        <select data-bind="contrib401kMode">
+          <option value="percent">% of salary</option>
+          <option value="dollar">Dollar amount</option>
+        </select></div>
+      <div class="field" id="f401kPct">
+        <div class="field-head"><label>401(k) contribution</label><span class="field-value" data-out="contrib401kPercent"></span></div>
+        <input type="range" data-bind="contrib401kPercent" data-kind="rate" min="0" max="0.75" step="0.005">
+        <div class="field-hint" id="hint401k"></div>
+      </div>
+      <div class="field" id="f401kDol" style="display:none">
+        <div class="field-head"><label>401(k) contribution</label><span class="field-value" data-out="contrib401kDollar"></span></div>
+        <input type="range" data-bind="contrib401kDollar" data-kind="money" min="0" max="4000000" step="25000">
+      </div>
+      <div class="field">
+        <div class="field-head"><label>Share going to Roth 401(k)</label><span class="field-value" data-out="roth401kSplit"></span></div>
+        <input type="range" data-bind="roth401kSplit" data-kind="rate" min="0" max="1" step="0.05">
+        <div class="field-hint">0% = all traditional (pre-tax), 100% = all Roth (post-tax).</div>
+      </div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Match rate</label><span class="field-value" data-out="employerMatchRate"></span></div>
+          <input type="range" data-bind="employerMatchRate" data-kind="rate" min="0" max="1.5" step="0.05"></div>
+        <div class="field"><div class="field-head"><label>up to % of pay</label><span class="field-value" data-out="employerMatchCapPct"></span></div>
+          <input type="range" data-bind="employerMatchCapPct" data-kind="rate" min="0" max="0.15" step="0.005"></div>
+      </div>
+      <div class="field"><div class="field-head"><label>&hellip; and a dollar cap (0 = none)</label></div>
+        <input type="number" data-bind="employerMatchDollarCap" data-kind="money-num">
+        <div class="field-hint">Many plans cap the match in dollars as well as a percentage, e.g. "6% of pay, max $6,000". The dollar cap bites harder every year as pay rises.</div></div>
+
+      <label class="check"><input type="checkbox" data-bind="backdoorRoth"> Backdoor Roth IRA</label>
+      <div class="field-hint" style="margin:-4px 0 9px">Non-deductible traditional IRA contribution converted immediately, bypassing the income phase-out. Watch the pro-rata rule if you hold any pre-tax traditional IRA.</div>
+
+      <label class="check"><input type="checkbox" data-bind="afterTax401kEnabled"> Mega backdoor Roth (after-tax 401k)</label>
+      <div class="field-hint" style="margin:-4px 0 9px">Fills the §415(c) headroom left after your deferrals and the employer match, converted to Roth. Needs a plan that allows both after-tax contributions and in-plan conversion — many allow neither, so check before relying on it.</div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>After-tax amount (0 = fill)</label></div>
+          <input type="number" data-bind="afterTax401kAmount" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>Plan cap (0 = IRS limit)</label></div>
+          <input type="number" data-bind="plan415cLimit" data-kind="money-num"></div>
+      </div>
+      <div class="field-hint" style="margin:-4px 0 9px">Plans may cap annual additions below the statutory figure; the lower of the two applies. If you retire before 59½, consider not filling the whole headroom — after-tax dollars are locked in the plan, while a taxable account can bridge the gap.</div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Roth IRA</label></div>
+          <input type="number" data-bind="contribRothIra" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>Traditional IRA</label></div>
+          <input type="number" data-bind="contribTradIra" data-kind="money-num"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>HSA</label></div>
+          <input type="number" data-bind="contribHsa" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>Brokerage (direct)</label></div>
+          <input type="number" data-bind="contribBrokerage" data-kind="money-num"></div>
+      </div>
+      <div class="field"><div class="field-head"><label>HSA coverage</label></div>
+        <select data-bind="hsaCoverage"><option value="selfOnly">Self only</option><option value="family">Family</option></select></div>
+      <label class="check"><input type="checkbox" data-bind="coveredByEmployerPlan"> Covered by an employer retirement plan</label>
+      <div class="field-hint">Affects traditional-IRA deductibility phase-out.</div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>Starting balances</summary>
+    <div class="group-body">
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Cash / checking</label></div>
+          <input type="number" data-bind="balances.cash" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>Traditional 401(k)</label></div>
+          <input type="number" data-bind="balances.trad401k" data-kind="money-num"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Roth 401(k)</label></div>
+          <input type="number" data-bind="balances.roth401k" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>Roth IRA</label></div>
+          <input type="number" data-bind="balances.rothIra" data-kind="money-num"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Traditional IRA</label></div>
+          <input type="number" data-bind="balances.tradIra" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>HSA</label></div>
+          <input type="number" data-bind="balances.hsa" data-kind="money-num"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Brokerage</label></div>
+          <input type="number" data-bind="balances.brokerage" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>&hellip; its cost basis</label></div>
+          <input type="number" data-bind="balances.brokerageBasis" data-kind="money-num"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><div class="field-head"><label>Gold</label></div>
+          <input type="number" data-bind="balances.commodities" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>Crypto</label></div>
+          <input type="number" data-bind="balances.crypto" data-kind="money-num"></div>
+        <div class="field"><div class="field-head"><label>529</label></div>
+          <input type="number" data-bind="balances.c529" data-kind="money-num"></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>Return assumptions</summary>
+    <div class="group-body" id="returnsBody"></div>
+    <div class="group-body" style="padding-top:0">
+      <div class="field"><div class="field-head"><label>Dividend yield (brokerage)</label><span class="field-value" data-out="dividendYield"></span></div>
+        <input type="range" data-bind="dividendYield" data-kind="rate" min="0" max="0.06" step="0.0025">
+        <div class="field-hint">Paid out as cash each year; subtracted from the brokerage's price return so it isn't double-counted.</div></div>
+      <div class="field"><div class="field-head"><label>Cash interest rate</label><span class="field-value" data-out="cashInterestRate"></span></div>
+        <input type="range" data-bind="cashInterestRate" data-kind="rate" min="0" max="0.08" step="0.0025"></div>
+      <label class="check"><input type="checkbox" data-bind="glidePath.enabled"> Glide path (shift to bonds near retirement)</label>
+      <div class="field"><div class="field-head"><label>Contribution growth timing</label></div>
+        <select data-bind="contributionTiming">
+          <option value="mid">Mid-year (half a year of growth)</option>
+          <option value="start">Start of year (full growth)</option>
+          <option value="end">End of year (no growth)</option>
+        </select></div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>Cash sweep</summary>
+    <div class="group-body">
+      <label class="check"><input type="checkbox" data-bind="sweep.enabled"> Sweep excess cash into investments</label>
+      <div class="field"><div class="field-head"><label>Buffer mode</label></div>
+        <select data-bind="sweep.bufferMode">
+          <option value="months">Months of expenses</option>
+          <option value="dollar">Fixed dollar amount</option>
+        </select></div>
+      <div class="field" id="fBufMonths">
+        <div class="field-head"><label>Minimum cash buffer</label><span class="field-value" data-out="sweep.bufferMonths"></span></div>
+        <input type="range" data-bind="sweep.bufferMonths" data-kind="plain" min="0" max="24" step="1"></div>
+      <div class="field" id="fBufDollar" style="display:none">
+        <div class="field-head"><label>Minimum cash buffer</label></div>
+        <input type="number" data-bind="sweep.bufferDollar" data-kind="money-num"></div>
+      <div class="field"><div class="field-head"><label>Sweep frequency</label></div>
+        <select data-bind="sweep.frequency">
+          <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option>
+        </select>
+        <div class="field-hint">Determines how many tax lots a year of sweeping creates, which drives the short- vs long-term holding period on later sales.</div></div>
+      <div class="field"><div class="field-head"><label>Destination</label></div>
+        <select data-bind="sweep.destination">
+          <option value="brokerage">Taxable brokerage</option>
+          <option value="commodities">Gold / commodities</option>
+          <option value="crypto">Crypto</option>
+        </select></div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>Retirement &amp; withdrawals</summary>
+    <div class="group-body">
+      <div class="field">
+        <div class="field-head"><label>Retirement age</label><span class="field-value" data-out="retirementAge"></span></div>
+        <input type="range" data-bind="retirementAge" data-kind="plain" min="35" max="85" step="1"></div>
+      <div class="field">
+        <div class="field-head"><label>Retirement spending, after tax</label><span class="field-value" data-out="retirementSpending"></span></div>
+        <input type="range" data-bind="retirementSpending" data-kind="money" min="0" max="50000000" step="100000">
+        <div class="field-hint" id="grossUpHint">In today's dollars, inflated each year. This is what lands in your pocket — withdrawals are automatically grossed up to cover the tax they trigger.</div></div>
+      <div class="row2">
+        <div class="field"><div class="field-head"><label>Soc. Sec. start age</label></div>
+          <input type="number" data-bind="socialSecurityStartAge" min="62" max="70"></div>
+        <div class="field"><div class="field-head"><label>Soc. Sec. / yr</label></div>
+          <input type="number" data-bind="socialSecurityAnnual" data-kind="money-num"></div>
+      </div>
+      <div class="field"><div class="field-head"><label>Pension / yr (today's $)</label></div>
+        <input type="number" data-bind="pensionAnnual" data-kind="money-num"></div>
+      <div class="field"><div class="field-head"><label>Withdrawal order</label></div>
+        <div id="withdrawalOrder" class="note"></div>
+        <div class="field-hint">Drag to reorder. Default is the common tax-efficient sequence: taxable first, traditional next, Roth last.</div></div>
+      <div class="field"><div class="field-head"><label>Roth conversion ladder</label></div>
+        <select data-bind="rothConversionMode">
+          <option value="none">None</option>
+          <option value="fillBracket">Fill to the top of a bracket</option>
+          <option value="fixed">Fixed amount per year</option>
+        </select>
+        <div class="field-hint">Moves traditional money to Roth in low-income years, paying tax now at a low rate instead of later at a higher one. Often the single biggest lever for an early retiree, because it also drains the balance that would otherwise force large RMDs.</div></div>
+      <div class="field" id="fConvBracket" style="display:none">
+        <div class="field-head"><label>Fill to the top of</label></div>
+        <select data-bind="rothConversionFillToRate">
+          <option value="0.10">10% bracket</option>
+          <option value="0.12">12% bracket</option>
+          <option value="0.22">22% bracket</option>
+          <option value="0.24">24% bracket</option>
+        </select></div>
+      <div class="field" id="fConvFixed" style="display:none">
+        <div class="field-head"><label>Convert per year</label></div>
+        <input type="number" data-bind="rothConversionAmount" data-kind="money-num"></div>
+      <div class="row2" id="fConvAges" style="display:none">
+        <div class="field"><div class="field-head"><label>Start age</label></div>
+          <input type="number" data-bind="rothConversionStartAge"></div>
+        <div class="field"><div class="field-head"><label>End age</label></div>
+          <input type="number" data-bind="rothConversionEndAge"></div>
+      </div>
+
+      <div class="field"><div class="field-head"><label>Tax lot selection</label></div>
+        <select data-bind="lotSelectionMethod">
+          <option value="ltFirst">Long-term first (lowest rate)</option>
+          <option value="hifo">Highest cost first (smallest gain)</option>
+          <option value="fifo">First in, first out</option>
+        </select></div>
+      <label class="check"><input type="checkbox" data-bind="penaltyExceptionApplies"> An early-withdrawal penalty exception applies</label>
+      <label class="check"><input type="checkbox" data-bind="coverShortfallsByWithdrawing"> Cover pre-retirement shortfalls by withdrawing</label>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>Real estate</summary>
+    <div class="group-body">
+      <div id="propList"></div>
+      <button class="sm" id="btnAddProp">+ Add property</button>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>Per-year overrides</summary>
+    <div class="group-body">
+      <div class="note" style="margin-bottom:8px">Override a single year: a bonus, a one-off expense, a forced withdrawal, or flipping that year to retired.</div>
+      <div id="overrideList"></div>
+      <div class="row2" style="margin-top:8px">
+        <input type="number" id="ovYear" placeholder="Year">
+        <button class="sm" id="btnAddOverride">+ Add</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>Display</summary>
+    <div class="group-body">
+      <label class="check"><input type="checkbox" data-bind="displayRealDollars"> Show real (today's) dollars</label>
+      <label class="check"><input type="checkbox" data-bind="indexBracketsToInflation"> Index tax brackets to inflation</label>
+      <div class="field-hint">Turning indexing off models bracket creep, where frozen brackets pull more income into higher rates over time.</div>
+      <div class="toolbar" style="margin-top:10px">
+        <button class="sm" id="btnReset">Reset to defaults</button>
+        <button class="sm" id="btnExport">Export JSON</button>
+      </div>
+      <div class="toolbar">
+        <button class="sm" id="btnCsv">Download CSV</button>
+      </div>
+    </div>
+  </details>
+
+</aside>
+
+<!-- ============================== MAIN ============================== -->
+<main class="main">
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="table">Year-by-year table</button>
+    <button class="tab" data-tab="withdrawals">Withdrawal detail</button>
+    <button class="tab" data-tab="scenarios">Scenario comparison</button>
+    <button class="tab" data-tab="montecarlo">Monte Carlo</button>
+    <button class="tab" data-tab="stress">Stress test</button>
+    <button class="tab" data-tab="about">Assumptions</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="tabpane active" id="pane-overview">
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="card">
+      <h3 class="card-title">Balance by account type</h3>
+      <p class="card-sub">Stacked. Real estate shown as equity (value less mortgage).</p>
+      <div class="chart-box tall"><canvas id="chartStack"></canvas></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Total net worth</h3>
+      <p class="card-sub">The dashed marker is your retirement year.</p>
+      <div class="chart-box"><canvas id="chartNetWorth"></canvas></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Tax paid per year</h3>
+      <p class="card-sub">Stacked by category, with the effective rate overlaid on the right axis.</p>
+      <div class="chart-box"><canvas id="chartTax"></canvas></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Income vs spending</h3>
+      <p class="card-sub">
+        Every source of cash, stacked above the line; everything it goes to, below.
+        Hover any year for the amounts and each source's share of income. The black
+        line is the net, and the two sides reconcile to it exactly. Cash sweeps are
+        not shown — they move money between your own accounts rather than in or out.
+      </p>
+      <div class="chart-box tall"><canvas id="chartCashFlow"></canvas></div>
+    </div>
+    <div class="card" id="warnCard" style="display:none">
+      <h3 class="card-title">Notes from this run</h3>
+      <p class="card-sub">Contribution limits that bound, phase-outs that bit, and shortfalls.</p>
+      <div class="warnings" id="warnList"></div>
+    </div>
+  </section>
+
+  <!-- TABLE -->
+  <section class="tabpane" id="pane-table">
+    <div class="toolbar">
+      <label class="check" style="margin:0"><input type="checkbox" id="tblCompact" checked> Compact columns</label>
+      <div class="spacer"></div>
+      <button class="sm" id="btnCsv2">Download CSV</button>
+    </div>
+    <div class="table-wrap"><table id="mainTable"></table></div>
+  </section>
+
+  <!-- WITHDRAWALS -->
+  <section class="tabpane" id="pane-withdrawals">
+    <div class="card">
+      <h3 class="card-title">Withdrawal detail</h3>
+      <p class="card-sub">Every year in which an account was drawn down: what was sold, from where, and the tax it triggered.</p>
+      <div class="table-wrap"><table id="wdTable"></table></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Withdrawals by source</h3>
+      <div class="chart-box"><canvas id="chartWd"></canvas></div>
+    </div>
+  </section>
+
+  <!-- SCENARIOS -->
+  <section class="tabpane" id="pane-scenarios">
+    <div class="card">
+      <h3 class="card-title">Net worth by scenario</h3>
+      <p class="card-sub">Add up to four scenarios in the sidebar, then edit each one's inputs independently.</p>
+      <div class="chart-box tall"><canvas id="chartScen"></canvas></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Side by side</h3>
+      <div class="table-wrap"><table id="scenTable"></table></div>
+    </div>
+  </section>
+
+  <!-- MONTE CARLO -->
+  <section class="tabpane" id="pane-montecarlo">
+    <div class="card">
+      <h3 class="card-title">Randomised return sequences</h3>
+      <p class="card-sub">
+        Each trial draws a fresh sequence of annual returns from a lognormal distribution
+        per asset class, so the order of good and bad years varies. This is what exposes
+        sequence-of-returns risk: the same average return can succeed or fail depending on
+        when the bad years land.
+      </p>
+      <div class="toolbar">
+        <label style="font-size:11.5px;color:var(--text-dim)">Trials</label>
+        <select id="mcTrials" style="width:auto">
+          <option>200</option><option selected>500</option><option>1000</option><option>2000</option>
+        </select>
+        <label style="font-size:11.5px;color:var(--text-dim)">Seed</label>
+        <input type="number" id="mcSeed" value="12345" style="width:90px">
+        <button class="primary" id="btnRunMc">Run simulation</button>
+        <span id="mcStatus" class="note"></span>
+      </div>
+      <progress id="mcProgress" value="0" max="1" style="display:none"></progress>
+    </div>
+    <div id="mcResults" style="display:none">
+      <div class="stat-grid" id="mcStats"></div>
+      <div class="card">
+        <h3 class="card-title">Outcome range over time</h3>
+        <p class="card-sub">Shaded bands are the 10th–90th and 25th–75th percentiles; the solid line is the median.</p>
+        <div class="chart-box tall"><canvas id="chartMc"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STRESS -->
+  <section class="tabpane" id="pane-stress">
+    <div class="card">
+      <h3 class="card-title">Optimistic / average / pessimistic</h3>
+      <p class="card-sub">The same plan under three fixed return environments, plus a sequence-risk case where a crash lands right at retirement — historically the most damaging timing.</p>
+      <div class="chart-box tall"><canvas id="chartStress"></canvas></div>
+    </div>
+    <div class="stat-grid" id="stressStats"></div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="tabpane" id="pane-about">
+    <div class="card">
+      <h3 class="card-title">What this model does and does not do</h3>
+      <div id="aboutBody" class="note"></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Tax data in use</h3>
+      <div class="table-wrap" style="max-height:420px"><table id="cfgTable"></table></div>
+    </div>
+  </section>
+</main>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script src="auth.js"></script>
+<script src="money.js"></script>
+<script src="tax-config.js"></script>
+<script src="tax-engine.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
