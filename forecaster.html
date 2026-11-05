@@ -1011,14 +1011,24 @@ html[data-theme="light"] .cheatbanner { background: #fff6e2; }
  * never grow a second row and steal chart height — the clipping failure
  * this app has already had twice.
  * =================================================================== */
+/* One row, two groups: profiles + Save/Manage on the left, the main
+ * navigation on the right. Neither group wraps; the profile chips scroll
+ * sideways instead, so the row stays one line high. */
+.pbrow {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-width: 0;
+}
+.pb-nav { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+.pb-nav .btn { white-space: nowrap; }
 .pbar {
-  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px;
   min-height: 34px; padding: 0 2px;
   border-top: 2px solid transparent; transition: border-color .15s;
 }
 .pbar.comparing { border-top-color: var(--amb); }
+/* Shrinks to its chips (not flex-grow), so Save/Manage sit directly after
+ * the last one; once the chips outgrow the row they scroll. */
 .pb-strip {
-  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px;
+  flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px;
   overflow-x: auto; overscroll-behavior-x: contain; padding: 3px 0;
   scrollbar-width: thin;
 }
@@ -1058,6 +1068,10 @@ html[data-theme="light"] .cheatbanner { background: #fff6e2; }
 .cmpmatrix:empty { display: none; }
 
 @media (max-width: 860px) {
+  /* Too narrow for both groups on one line: the nav drops under the
+   * profiles rather than squeezing the chips to nothing. */
+  .pbrow { flex-wrap: wrap; row-gap: 4px; }
+  .pb-nav { flex: 1 1 100%; justify-content: flex-end; }
   .pchip { max-width: 130px; }
   .pc-nm { padding: 5px 8px; }
 }
@@ -1181,7 +1195,20 @@ html[data-theme="light"] .cheatbanner { background: #fff6e2; }
          of the chart: it is outside the min-height:0 scroll chain, has a
          fixed height and never wraps, so it cannot grow a second row and
          steal chart height. -->
-    <div class="pbar" id="pbar"></div>
+    <div class="pbrow">
+      <!-- Left: the profiles, with Save and Manage rendered straight
+           after the last chip. Re-rendered by renderProfBar. -->
+      <div class="pbar" id="pbar"></div>
+      <!-- Right: the four things people reach for most. Static markup,
+           NOT inside #pbar, because renderProfBar rewrites #pbar's
+           innerHTML and would destroy these buttons' listeners. -->
+      <div class="pb-nav" id="pbNav">
+        <button class="btn amb p hidden" id="btnOptimise" title="Auto-optimise (O)">&#9670; Auto-optimise</button>
+        <button class="btn g" id="btnSettings" title="Settings (S)">Settings</button>
+        <button class="btn g" id="btnProfiles" title="Profiles (P)">Profiles</button>
+        <button class="btn g" id="btnCharacter" title="Character (C)">Character</button>
+      </div>
+    </div>
 
     <!-- ============ MAIN ============ -->
     <div class="main">
@@ -1200,16 +1227,6 @@ html[data-theme="light"] .cheatbanner { background: #fff6e2; }
             <span class="key">P profiles</span><span class="key">M mute</span>
             <span class="key hidden" id="cheatMark" title="Auto-optimise unlocked — press O">◆ O optimise</span>
             <span class="key cheatprog hidden" id="cheatProg"></span>
-          </div>
-          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn amb p hidden" id="btnOptimise" style="flex:1">◆ Auto-optimise</button>
-          </div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <button class="btn g" id="btnSettings" style="flex:1">Settings</button>
-            <button class="btn g" id="btnProfiles" style="flex:1">Profiles</button>
-          </div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <button class="btn g" id="btnCharacter" style="flex:1">Character</button>
           </div>
         </div>
       </div>
