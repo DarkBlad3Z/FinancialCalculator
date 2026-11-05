@@ -62,6 +62,10 @@ const AUTH_CONFIG = {
    *                This IS a shared secret, so publishing burns it —
    *                but it is pleasant to pass on verbally.
    *   'password'   the PBKDF2 password gate.
+   *   'off'        NO GATE. Opens straight to the app. Right for a
+   *                private copy on your own machine; wrong for
+   *                anything published, where it means no barrier at
+   *                all. Nothing else about the app changes.
    * --------------------------------------------------------------- */
   mode: 'dial',
 
@@ -738,6 +742,12 @@ const AUTH_CONFIG = {
     document.getElementById('authGate')?.remove();
     // Charts size from a visible container, so nudge them once shown.
     window.dispatchEvent(new Event('resize'));
+    /* Announce the unlock so the app can sequence what comes next.
+     * Character creation must open AFTER the gate clears, not behind
+     * it — otherwise it renders under the lock overlay and the user
+     * never sees it. */
+    window.__pfUnlocked = true;
+    window.dispatchEvent(new Event('pf-unlocked'));
   }
 
   function buildGate() {
@@ -881,6 +891,12 @@ const AUTH_CONFIG = {
   }
 
   function init() {
+    /* mode 'off' means no gate at all. A combination lock is the right
+     * default for something published on the open web, but it is a wall
+     * in front of a tool someone runs on their own machine — and the
+     * owner should not have to solve a puzzle to look at their own
+     * forecast. Set it here, or leave the default for a public copy. */
+    if (AUTH_CONFIG.mode === 'off') { reveal(); return; }
     if (alreadyUnlocked()) { reveal(); return; }
     buildGate();
   }

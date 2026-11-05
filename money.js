@@ -127,14 +127,21 @@ const Money = {
     return Money.add(cents, Money.mul(cents, rate));
   },
 
-  /** Format integer cents for display, e.g. 123456789 -> "$1,234,568". */
-  fmt(cents, { decimals = 0, sign = false, compact = false } = {}) {
+  /** Format integer cents for display, e.g. 123456789 -> "$1,234,568".
+   *
+   * `compact` takes an optional digit count. One decimal ("$6.6M") is
+   * right for an axis label but wrong for a headline figure that is
+   * meant to respond to a slider: net worth has to move about $100,000
+   * before $6.6M becomes $6.7M, so dragging a control looked like it did
+   * nothing at all. Two decimals ("$6.57M") responds at roughly $5,000,
+   * which is the scale a single slider step actually moves. */
+  fmt(cents, { decimals = 0, sign = false, compact = false, compactDigits = 1 } = {}) {
     const d = cents / 100;
     if (compact) {
       const abs = Math.abs(d);
       const unit = abs >= 1e9 ? ['B', 1e9] : abs >= 1e6 ? ['M', 1e6] : abs >= 1e3 ? ['K', 1e3] : ['', 1];
       const v = d / unit[1];
-      const s = `$${v.toFixed(abs >= 1e3 ? 1 : 0)}${unit[0]}`;
+      const s = `$${v.toFixed(abs >= 1e3 ? compactDigits : 0)}${unit[0]}`;
       return sign && d > 0 ? `+${s}` : s;
     }
     const s = d.toLocaleString('en-US', {

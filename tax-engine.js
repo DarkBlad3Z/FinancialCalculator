@@ -42,12 +42,18 @@ function taxOnBrackets(taxable, brackets) {
 }
 
 /** The rate that applies to the next dollar of ordinary income. */
+/* The rate the NEXT dollar would be taxed at.
+ *
+ * `<`, not `<=`. At taxable income exactly equal to a bracket's top, the
+ * band is full — the next dollar falls into the one above. `<=` reported
+ * the band just filled, which is off by one at the boundary and, more
+ * visibly, made the year playbook's headroom disagree with the marginal
+ * rate shown two lines above it. Inside a band the two are identical,
+ * so this only ever differed at an exact boundary. */
 function marginalRate(taxable, brackets) {
-  let lower = 0;
   for (const b of brackets) {
     const top = b.upTo === null ? Infinity : b.upTo;
-    if (taxable <= top) return b.rate;
-    lower = top;
+    if (taxable < top) return b.rate;
   }
   return brackets[brackets.length - 1].rate;
 }

@@ -388,7 +388,7 @@ function defaultInputs() {
     customStateRate: 0,
 
     /* --- Income (section 5) --- */
-    salary: 15_000_000,              // $150,000
+    salary: 20_000_000,              // $200,000
     salaryGrowth: 0.03,
     bonus: 0,
     otherIncome: 0,
@@ -429,7 +429,10 @@ function defaultInputs() {
      * converted immediately. Bypasses the Roth MAGI phase-out. Subject
      * to the pro-rata rule if any pre-tax traditional IRA balance
      * exists, which the engine computes and warns about. */
-    backdoorRoth: false,
+    /* On by default: the default earner ($200k, single) is above the
+     * direct-Roth MAGI phase-out, so without it the Roth IRA contribution
+     * is silently zero. No pre-tax IRA balance, so no pro-rata tax. */
+    backdoorRoth: true,
 
     /* ROTH CONVERSION LADDER (spec section 7, withdrawal strategy).
      * Moving traditional money to Roth voluntarily, recognising it as
@@ -460,7 +463,7 @@ function defaultInputs() {
     /* --- Starting balances (section 3) --- */
     balances: {
       cash: 3_000_000,
-      trad401k: 20_000_000,
+      trad401k: 100_000_000,         // $1,000,000
       roth401k: 0,
       tradIra: 0,
       rothIra: 5_000_000,
@@ -1326,6 +1329,13 @@ function simulate(inputs, options = {}) {
       taxPenalty: real(taxResult.earlyWithdrawalPenalty),
       effectiveTaxRate: taxResult.effectiveRate,
       marginalRate: taxResult.marginalOrdinaryRate,
+      /* Exposed because "how much more ORDINARY income fits in this
+       * bracket" has to be measured against the ordinary base, not the
+       * total. Guidance was using taxableIncome (ordinary + preferential)
+       * and so reported a different bracket from the marginal rate right
+       * beside it — two numbers on one panel disagreeing. */
+      taxableOrdinary: taxResult.taxableOrdinary,
+      taxablePreferential: taxResult.taxablePreferential,
       agi: real(taxResult.agi),
       taxableIncome: real(taxResult.taxableTotal),
 
@@ -1573,8 +1583,24 @@ function sequenceRiskTest(inputs, { crashYears = 3, crashReturn = -0.15 } = {}) 
   return simulate({ ...inputs, overrides });
 }
 
+/* The row a "net worth at age N" figure refers to.
+ *
+ * One home, because this rule was written out in two places — the
+ * status strip and the profile comparison — and the two had already
+ * drifted once: one used `age === target`, the other `age >= target`,
+ * so the headline figure and the comparison table could answer the same
+ * question differently whenever the target age fell between rows (or
+ * below the current age, which Settings permits).
+ *
+ * `>=` with a fallback to the final row: the first year at or past the
+ * target, or the end of the horizon if the target is beyond it. */
+function rowAtAge(rows, age) {
+  if (!rows || !rows.length) return null;
+  return rows.find((r) => r.age >= age) ?? rows[rows.length - 1];
+}
+
 return {
-  simulate, monteCarlo, stressTest, sequenceRiskTest,
+  simulate, monteCarlo, stressTest, sequenceRiskTest, rowAtAge,
   defaultInputs, defaultProperty, normalizeInputs,
   makeLot, lotsValue, lotsBasis, growLots, sellFromLots,
   blendedReturn, applyGlidePath, monthlyPayment, amortizeYear, processProperty,

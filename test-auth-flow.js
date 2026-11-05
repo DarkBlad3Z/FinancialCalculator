@@ -103,6 +103,37 @@ function solve(text){
   ok('gate element removed', removed.includes('authGate'));
   ok('solve persisted to storage', stored['pf-forecaster-unlocked']==='solved');
 
+  /* ------------------------------------------------------------------
+   * mode 'off' — no gate at all.
+   * A combination lock is right for a copy published on the open web
+   * and wrong for one someone runs on their own machine: the owner
+   * should not solve a puzzle to look at their own forecast. This
+   * asserts the escape hatch works and, just as important, that it
+   * does not silently leave the page locked.
+   * ---------------------------------------------------------------- */
+  {
+    locked = true;
+    removed.length = 0;
+    let built = 0;
+    const realAppend = document.body.appendChild;
+    document.body.appendChild = function (n) { built++; return realAppend.call(this, n); };
+    delete window.__pfUnlocked;
+
+    const src = require('fs').readFileSync(__dirname + '/auth.js', 'utf8')
+      .replace("mode: 'dial',", "mode: 'off',");
+    eval(src);
+    document.body.appendChild = realAppend;
+
+    ok('mode "off" unlocks the page immediately', !locked);
+    ok('and builds no puzzle at all', built === 0, 'appended ' + built + ' nodes');
+    ok('it still announces the unlock, so app.js proceeds',
+       window.__pfUnlocked === true);
+    ok('the default is NOT off — a published copy keeps its gate',
+       /mode: 'dial',/.test(require('fs').readFileSync(__dirname + '/auth.js', 'utf8')));
+    ok('and the option is documented where someone would look for it',
+       /'off'\s+NO GATE/.test(require('fs').readFileSync(__dirname + '/auth.js', 'utf8')));
+  }
+
   console.log();
   console.log(fails===0 ? 'GATE FLOW: ALL PASSED' : fails+' FAILURES');
   process.exit(fails?1:0);

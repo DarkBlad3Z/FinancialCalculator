@@ -405,8 +405,8 @@ const capped = eng.simulate({ ...base, contrib401kMode: 'dollar', contrib401kDol
 checkTrue('excess 401k contribution is capped at the IRS limit',
   capped.rows[0].contrib401k <= tax.max401kDeferral(base.currentAge, CFG));
 
-// Employer match: 100% of the first 4% of a $150,000 salary = $6,000.
-check('employer match = $6,000', D(run.rows[0].employerMatch), 6000, 1);
+// Employer match: 100% of the first 4% of a $200,000 salary = $8,000.
+check('employer match = $8,000', D(run.rows[0].employerMatch), 8000, 1);
 
 // RMDs must appear at the right age and be non-zero.
 const rmdRow = run.rows.find((r) => r.withdrawals.rmdRequired > 0);
@@ -444,7 +444,10 @@ const partTime = eng.simulate({
 check('IRA capped at earned income', D(partTime.rows[0].contribIra), 4000, 1);
 
 // Enough wages: the full contribution goes in.
-const fullWage = eng.simulate({ ...base, currentAge: 54, contribRothIra: $(7500), contribTradIra: 0 });
+// A salary under the direct-Roth phase-out, so this isolates the earned-income
+// cap; the default $200k earner is covered by the phase-out and backdoor tests.
+const fullWage = eng.simulate({ ...base, currentAge: 54, salary: $(100000), backdoorRoth: false,
+  contribRothIra: $(7500), contribTradIra: 0 });
 check('ample earned income => full IRA contribution', D(fullWage.rows[0].contribIra), 7500, 1);
 
 // Gross income must break out into parts that sum back to the total.
@@ -1070,13 +1073,13 @@ const caRun = eng.simulate({ ...base, stateCode: 'CA' });
 checkTrue('California ends poorer than Washington',
   caRun.summary.endingNetWorth < run.summary.endingNetWorth);
 
-// The default book ($6.3M at 65, 15 years of retirement) survives $250k/yr
-// of base spending; it does not survive $500k. Both directions are checked
+// The default book (a $1M 401(k) and a $200k salary) survives $250k/yr of
+// base spending; it does not survive $700k. Both directions are checked
 // so the test pins the actual behaviour rather than a guess.
 const midSpend = eng.simulate({ ...base, retirementSpending: $(250000) });
 checkTrue('$250k/yr is survivable on this book', !midSpend.summary.depleted);
-const bigSpend = eng.simulate({ ...base, retirementSpending: $(500000) });
-checkTrue('$500k/yr depletes the portfolio', bigSpend.summary.depleted);
+const bigSpend = eng.simulate({ ...base, retirementSpending: $(700000) });
+checkTrue('$700k/yr depletes the portfolio', bigSpend.summary.depleted);
 checkTrue('more spending always leaves less at the end',
   bigSpend.summary.endingNetWorth <= midSpend.summary.endingNetWorth);
 
