@@ -59,7 +59,20 @@
          of the chart: it is outside the min-height:0 scroll chain, has a
          fixed height and never wraps, so it cannot grow a second row and
          steal chart height. -->
-    <div class="pbar" id="pbar"></div>
+    <div class="pbrow">
+      <!-- Left: the profiles, with Save and Manage rendered straight
+           after the last chip. Re-rendered by renderProfBar. -->
+      <div class="pbar" id="pbar"></div>
+      <!-- Right: the four things people reach for most. Static markup,
+           NOT inside #pbar, because renderProfBar rewrites #pbar's
+           innerHTML and would destroy these buttons' listeners. -->
+      <div class="pb-nav" id="pbNav">
+        <button class="btn amb p hidden" id="btnOptimise" title="Auto-optimise (O)">&#9670; Auto-optimise</button>
+        <button class="btn g" id="btnSettings" title="Settings (S)">Settings</button>
+        <button class="btn g" id="btnProfiles" title="Profiles (P)">Profiles</button>
+        <button class="btn g" id="btnCharacter" title="Character (C)">Character</button>
+      </div>
+    </div>
 
     <!-- ============ MAIN ============ -->
     <div class="main">
@@ -78,16 +91,6 @@
             <span class="key">P profiles</span><span class="key">M mute</span>
             <span class="key hidden" id="cheatMark" title="Auto-optimise unlocked — press O">◆ O optimise</span>
             <span class="key cheatprog hidden" id="cheatProg"></span>
-          </div>
-          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-            <button class="btn amb p hidden" id="btnOptimise" style="flex:1">◆ Auto-optimise</button>
-          </div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <button class="btn g" id="btnSettings" style="flex:1">Settings</button>
-            <button class="btn g" id="btnProfiles" style="flex:1">Profiles</button>
-          </div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <button class="btn g" id="btnCharacter" style="flex:1">Character</button>
           </div>
         </div>
       </div>

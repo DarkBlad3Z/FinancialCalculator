@@ -484,6 +484,35 @@ require('./app.js');
     ok('the active chip is marked', /class="pchip on/.test(bar));
     ok('save and manage live in the bar',
        /id="pbSave"/.test(bar) && /id="pbManage"/.test(bar));
+    /* Layout: profiles + Save/Manage on the left, the four nav buttons on
+     * the right, all one row. The nav is static markup OUTSIDE #pbar,
+     * because renderProfBar rewrites #pbar and would kill the listeners. */
+    const row = html.match(/<div class="pbrow">([\s\S]*?)<div class="col">/);
+    ok('there is one row holding both groups', !!row);
+    const rowHtml = row ? row[1] : '';
+    const iBar = rowHtml.indexOf('id="pbar"'), iNav = rowHtml.indexOf('id="pbNav"');
+    ok('profiles come first (left), nav second (right)', iBar >= 0 && iNav > iBar);
+    const navHtml = rowHtml.slice(iNav);
+    for (const id of ['btnOptimise', 'btnSettings', 'btnProfiles', 'btnCharacter']) {
+      ok(`${id} is in the right-hand nav`, navHtml.includes(`id="${id}"`));
+    }
+    ok('the nav is not inside the re-rendered profile bar',
+       !rowHtml.slice(iBar, iNav).includes('id="btnSettings"'));
+    ok('the command card no longer carries the buttons (each exists exactly once)',
+       ['btnOptimise', 'btnSettings', 'btnProfiles', 'btnCharacter']
+         .every((id) => html.split(`id="${id}"`).length === 2)
+       && html.indexOf('id="btnSettings"') < html.indexOf('id="cmd"'));
+    const wired = ['#btnOptimise', '#btnSettings', '#btnProfiles', '#btnCharacter']
+      .map((s) => (get(s)._l.click || []).length);
+    ok('every nav button has a click handler', wired.every((n) => n === 1), wired.join(','));
+    window.__pfTest.renderAll();
+    await wait(40);
+    ok('and they survive a re-render of the bar',
+       ['#btnOptimise', '#btnSettings', '#btnProfiles', '#btnCharacter']
+         .every((s) => (get(s)._l.click || []).length === 1));
+    ok('Save and Manage sit inside the left group, after the chips',
+       bar.indexOf('pb-strip') >= 0 && bar.indexOf('id="pbSave"') > bar.indexOf('pb-strip')
+       && bar.indexOf('id="pbManage"') > bar.indexOf('id="pbSave"'));
     ok('the bar is always present, never conditional on having profiles',
        /function renderProfBar/.test(src) && /const none = !P\.list\.length/.test(src));
   }

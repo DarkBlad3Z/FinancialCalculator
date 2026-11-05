@@ -1004,14 +1004,24 @@ html[data-theme="light"] .cheatbanner { background: #fff6e2; }
  * never grow a second row and steal chart height — the clipping failure
  * this app has already had twice.
  * =================================================================== */
+/* One row, two groups: profiles + Save/Manage on the left, the main
+ * navigation on the right. Neither group wraps; the profile chips scroll
+ * sideways instead, so the row stays one line high. */
+.pbrow {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px; min-width: 0;
+}
+.pb-nav { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+.pb-nav .btn { white-space: nowrap; }
 .pbar {
-  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px;
   min-height: 34px; padding: 0 2px;
   border-top: 2px solid transparent; transition: border-color .15s;
 }
 .pbar.comparing { border-top-color: var(--amb); }
+/* Shrinks to its chips (not flex-grow), so Save/Manage sit directly after
+ * the last one; once the chips outgrow the row they scroll. */
 .pb-strip {
-  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px;
+  flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px;
   overflow-x: auto; overscroll-behavior-x: contain; padding: 3px 0;
   scrollbar-width: thin;
 }
@@ -1051,6 +1061,10 @@ html[data-theme="light"] .cheatbanner { background: #fff6e2; }
 .cmpmatrix:empty { display: none; }
 
 @media (max-width: 860px) {
+  /* Too narrow for both groups on one line: the nav drops under the
+   * profiles rather than squeezing the chips to nothing. */
+  .pbrow { flex-wrap: wrap; row-gap: 4px; }
+  .pb-nav { flex: 1 1 100%; justify-content: flex-end; }
   .pchip { max-width: 130px; }
   .pc-nm { padding: 5px 8px; }
 }
